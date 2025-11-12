@@ -1,10 +1,10 @@
 # 🔒 Capstone: Voice Phishing Detection (텍스트 기반 보이스피싱 탐지 시스템 개발)
 
-서울과학기술대학교 인공지능응용학과 **캡스톤디자인** 과목의 프로젝트입니다. 
+서울과학기술대학교 인공지능응용학과 **캡스톤디자인** 과목 졸업 프로젝트
 
 # 📊 데이터 전처리
 
-- **Dataset:** KorCCVi Dataset (보이스피싱/일반 대화, 2.1version)
+- **Dataset:** KorCCVi Dataset (보이스피싱/일반 대화, 2.1 version)
 
 - **데이터 개수**
   - 일반 대화: 2,232개  
@@ -56,15 +56,19 @@ print(df_label1.head())
 
 저장소 루트로 이동해서 클론하는거까지는 따로 작성하진 않겠습니다!!
 아래 예시는 맨 처음 기준이라 브랜치 생성하면 거기서 계속 수정하면 되고
-수정하기전 계속 원격 상태 확인하셔야합니다 (pull해서)
+수정하기전 계속 원격 상태 확인하셔야합니다!! (pull해서)
 
 0) 최신 원격 상태(main) 가져오기(안전)
-1) ```bash
+
+```bash
 git fetch origin
-git pull origin main
 ```
 
-2) 브랜치 생성 및 이동
+```bash
+git pull origin main
+``` 
+
+1) 브랜치 생성 및 이동
 
 ```bash
 git checkout -b dev-db-kim
