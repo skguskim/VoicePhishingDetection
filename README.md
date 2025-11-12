@@ -46,7 +46,7 @@ print(df_label1.head())
 | 장수효 | `role_deletion.py` 구현 |
 | 정지훈 | `role_insertion.py` 구현 |
 
-> ⚠️ `/3` 분할 방식은 비효율적이라 현재는 개별 코드 구현 중심으로 진행.
+> ⚠️ `/3` 분할 방식은 비효율적이라 현재는 개별 코드 구현 중심으로 진행
 
 
 # 아키텍처 (초안)
@@ -55,21 +55,39 @@ print(df_label1.head())
 # 깃허브 사용법 (예시)
 
 1) 브랜치 생성 및 이동
+
+```bash
 git checkout -b dev-db-kim
+```
+
 
 2) 변경 파일 확인
+
+```bash
 git status
+```
 
 3) 스테이징
+
+```bash
 git add data/preprocessing.py
+```
 
 4) 커밋 (변경 요약을 규칙에 맞게)
+
+```bash
 git commit -m "전처리 스크립트 초기 추가"
 
+```
+
 5) 원격 푸시 
+
+```bash
 git push --set-upstream origin dev-db-kim
 
-## ✅ 커밋 메시지 규칙
+```
+
+## 커밋 메시지 규칙
 
 - 간단·명료한 개조식
 
@@ -77,8 +95,8 @@ git push --set-upstream origin dev-db-kim
 
 - 여러 작업은 커밋 분리
 
-## ✅ PR 규칙
+## PR 규칙
 
-PR 제목: 변경 요약 한 줄
+- PR 제목: 변경 요약 한 줄
 
-PR 본문 템플릿 사용(개요/변경 사항/기타)
+- PR 본문 템플릿 사용(개요/변경 사항/기타)
