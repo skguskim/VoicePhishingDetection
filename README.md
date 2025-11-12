@@ -54,7 +54,17 @@ print(df_label1.head())
 
 # 깃허브 사용법 (예시)
 
-1) 브랜치 생성 및 이동
+저장소 루트로 이동해서 클론하는거까지는 따로 작성하진 않겠습니다!!
+아래 예시는 맨 처음 기준이라 브랜치 생성하면 거기서 계속 수정하면 되고
+수정하기전 계속 원격 상태 확인하셔야합니다 (pull해서)
+
+0) 최신 원격 상태(main) 가져오기(안전)
+1) ```bash
+git fetch origin
+git pull origin main
+```
+
+2) 브랜치 생성 및 이동
 
 ```bash
 git checkout -b dev-db-kim
