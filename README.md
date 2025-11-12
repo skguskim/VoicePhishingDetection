@@ -37,7 +37,7 @@ df = pd.read_csv("data.csv")
 # label=1 (피싱 데이터)만 확인
 df_label1 = df[df["label"] == 1]
 print(df_label1.head())
-
+```
 ## 👥 역할 분담
 
 | 담당자 | 역할 |
