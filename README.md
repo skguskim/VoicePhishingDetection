@@ -38,6 +38,7 @@ df = pd.read_csv("data.csv")
 df_label1 = df[df["label"] == 1]
 print(df_label1.head())
 ```
+
 ## 👥 역할 분담
 
 | 담당자 | 역할 |
