@@ -1,38 +1,61 @@
 import os
+import random
+import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import (
     AutoTokenizer, 
     AutoModelForSequenceClassification, 
     Trainer, 
     TrainingArguments,
-    DataCollatorWithPadding
+    DataCollatorWithPadding,
+    set_seed
 )
 from datasets import Dataset
 
 # ==========================================
 # 설정 (Configuration)
 # ==========================================
-# 모델 ID 
-MODEL_ID = "answerdotai/ModernBERT-base"
+class Config:
+    MODEL_ID = "answerdotai/ModernBERT-base"
+    DATA_PATH = "data/dataset_master.csv" # 경로 확인 필요
+    SAVE_PATH = "./final_modernbert_model"
+    
+    # 하이퍼파라미터
+    MAX_LEN = 1024
+    BATCH_SIZE = 8
+    EPOCHS = 3
+    LEARNING_RATE = 5e-5
+    SEED = 42
+    
+    # 데이터 로더 설정 (속도 향상)
+    NUM_WORKERS = 2 
 
-# 데이터 경로 
-DATA_PATH = "data/dataset_master.csv"
-
-# 하이퍼파라미터
-MAX_LEN = 1024   # 메모리 부족 시 512로 줄이기 (ModernBERT는 최대 8192 지원)
-BATCH_SIZE = 8   # GPU 메모리에 따라 4 ~ 16 조절
-EPOCHS = 3
-LEARNING_RATE = 5e-5
+# 재현성을 위한 시드 고정
+set_seed(Config.SEED)
 
 # ==========================================
-# 데이터 로드 및 전처리
+# 유틸리티 함수
 # ==========================================
+def compute_metrics(pred):
+    labels = pred.label_ids
+    preds = pred.predictions.argmax(-1)
+    
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    acc = accuracy_score(labels, preds)
+    
+    return {
+        'accuracy': acc,
+        'f1': f1,
+        'precision': precision,
+        'recall': recall
+    }
+
 def load_and_preprocess_data(path):
     print(f"📂 Loading data from {path}...")
     
-    # 1. CSV 읽기 (인코딩 에러 발생 시 encoding='cp949' 또는 'euc-kr' 시도)
     try:
         df = pd.read_csv(path)
     except UnicodeDecodeError:
@@ -40,92 +63,86 @@ def load_and_preprocess_data(path):
 
     print(f"   - 전체 데이터 개수: {len(df)}")
 
-    # 2. 컬럼 이름 변경 (script -> text)
+    # 컬럼 이름 변경 (script -> text)
     if 'script' in df.columns:
         df = df.rename(columns={'script': 'text'})
-        print("   - 컬럼 이름 변경 완료: 'script' -> 'text'")
     
     # 필수 컬럼 확인
     if 'text' not in df.columns or 'label' not in df.columns:
         raise ValueError(f"데이터셋에 필수 컬럼이 없습니다. 현재 컬럼: {df.columns}")
 
-    # 3. 결측치 제거
+    # 결측치 제거
     df = df.dropna(subset=['text', 'label'])
     
-    # 4. 라벨 타입 정수형으로 변환 (혹시 모를 에러 방지)
+    # 라벨 타입 정수형으로 변환
     df['label'] = df['label'].astype(int)
 
     return df
 
-# 데이터 로드
-df = load_and_preprocess_data(DATA_PATH)
+# ==========================================
+# 실행 로직
+# ==========================================
 
-# ==========================================
-# 층화 추출 (Stratified Split) - 불균형 데이터 필수
-# ==========================================
-# 피싱(1)과 정상(0) 비율을 유지하면서 Train/Validation 나누기
+# 1. 데이터 로드 (Config.DATA_PATH 사용)
+df = load_and_preprocess_data(Config.DATA_PATH)
+
+# 2. 층화 추출
 train_df, val_df = train_test_split(
     df, 
     test_size=0.2, 
-    random_state=42, 
-    stratify=df['label'] # 핵심: 라벨 비율 유지
+    random_state=Config.SEED, 
+    stratify=df['label']
 )
 
 print(f"\n📊 데이터 분할 결과:")
 print(f"   - Train set: {len(train_df)} (Phishing: {sum(train_df['label']==1)})")
 print(f"   - Val set  : {len(val_df)} (Phishing: {sum(val_df['label']==1)})")
 
-# HuggingFace Dataset으로 변환
+# Dataset 변환
 train_dataset = Dataset.from_pandas(train_df)
 val_dataset = Dataset.from_pandas(val_df)
 
-# ==========================================
-# 토크나이저 및 모델 로드
-# ==========================================
+# 3. 토크나이저 및 모델 로드 (Config 변수 사용)
 print("\n🚀 Loading ModernBERT Model & Tokenizer...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+tokenizer = AutoTokenizer.from_pretrained(Config.MODEL_ID)
 
-# 전처리 함수
 def preprocess_function(examples):
     return tokenizer(
         examples["text"], 
         truncation=True, 
-        max_length=MAX_LEN, 
-        padding=False # Dynamic padding을 위해 여기서는 False
+        max_length=Config.MAX_LEN, 
+        padding=False 
     )
 
-# 토큰화 적용
 tokenized_train = train_dataset.map(preprocess_function, batched=True)
 tokenized_val = val_dataset.map(preprocess_function, batched=True)
 
-# 모델 로드 (0: 정상, 1: 피싱 -> 2개의 라벨)
 model = AutoModelForSequenceClassification.from_pretrained(
-    MODEL_ID, 
+    Config.MODEL_ID, 
     num_labels=2,
     trust_remote_code=True
 )
 
-# ==========================================
-# 학습 설정 (Trainer)
-# ==========================================
+# 4. 학습 설정 (Config 변수 사용 및 오타 수정)
 training_args = TrainingArguments(
     output_dir="./results",
-    learning_rate=LEARNING_RATE,
-    per_device_train_batch_size=BATCH_SIZE,
-    per_device_eval_batch_size=BATCH_SIZE,
-    num_train_epochs=EPOCHS,
+    learning_rate=Config.LEARNING_RATE,
+    per_device_train_batch_size=Config.BATCH_SIZE,
+    per_device_eval_batch_size=Config.BATCH_SIZE,
+    num_train_epochs=Config.EPOCHS,
     weight_decay=0.01,
-    eval_strategy="epoch",    # 매 epoch마다 평가
-    save_strategy="epoch",    # 매 epoch마다 저장
-    load_best_model_at_end=True, # 가장 성능 좋은 모델 불러오기
-    metric_for_best_model="eval_loss",
-    fp16=torch.cuda.is_available(), # GPU 사용 시 가속
+    eval_strategy="epoch",
+    save_strategy="epoch",
+    load_best_model_at_end=True,
+    metric_for_best_model="f1",  # 중복 제거: F1을 기준으로 설정
+    fp16=torch.cuda.is_available(),
     logging_dir='./logs',
     logging_steps=50,
-    report_to="none"
+    report_to="none",                # 콤마 추가됨 (중요!)
+    dataloader_num_workers=Config.NUM_WORKERS,
+    save_total_limit=2,
 )
 
-# 배치 처리 시 패딩을 동적으로 맞춰주는 Collator
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
 trainer = Trainer(
@@ -135,18 +152,14 @@ trainer = Trainer(
     eval_dataset=tokenized_val,
     tokenizer=tokenizer,
     data_collator=data_collator,
+    compute_metrics=compute_metrics,
 )
 
-# ==========================================
-#  학습 시작
-# ==========================================
+# 5. 학습 시작
 print("\n🔥 Starting Training...")
 trainer.train()
 
-# ==========================================
-# 최종 모델 저장
-# ==========================================
-SAVE_PATH = "./final_modernbert_model"
-trainer.save_model(SAVE_PATH)
-tokenizer.save_pretrained(SAVE_PATH)
-print(f"\n✅ Training Finished! Model saved to {SAVE_PATH}")
+# 6. 저장
+trainer.save_model(Config.SAVE_PATH)
+tokenizer.save_pretrained(Config.SAVE_PATH)
+print(f"\n✅ Training Finished! Model saved to {Config.SAVE_PATH}")
