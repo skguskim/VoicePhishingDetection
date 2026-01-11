@@ -1,7 +1,9 @@
 import os
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from transformers import (
     AutoTokenizer, 
     AutoModelForSequenceClassification, 
@@ -20,7 +22,7 @@ from sklearn.model_selection import train_test_split
 # ==========================================
 class Config:
     TEACHER_PATH = "./final_modernbert_model"  # 학습시킨 모델 경로
-    BASE_MODEL_ID = "answer/ModernBERT-base" # Student 모델 베이스
+    BASE_MODEL_ID = "answerdotai/ModernBERT-base" # Student 모델 베이스
     DATA_PATH = "data/dataset_master.csv"       # 데이터 경로 
     
     # 지식 증류 하이퍼파라미터 
@@ -36,6 +38,32 @@ class Config:
 
 set_seed(Config.SEED)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# ==========================================
+# 유틸리티: 평가 함수 (Metrics)
+# ==========================================
+def compute_metrics(pred):
+    labels = pred.label_ids
+    
+    # 예측값(pred.predictions)이 튜플로 올 수도 있고, 배열로 올 수도 있음
+    if isinstance(pred.predictions, tuple):
+        # 튜플인 경우 첫 번째 요소가 Logits
+        preds = pred.predictions[0]
+    else:
+        preds = pred.predictions
+        
+    # Logits에서 가장 높은 확률의 인덱스(0 또는 1) 추출
+    preds = np.argmax(preds, axis=-1)
+    
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    acc = accuracy_score(labels, preds)
+    
+    return {
+        'accuracy': acc,
+        'f1': f1,
+        'precision': precision,
+        'recall': recall
+    }
 
 # ==========================================
 # 커스텀 Trainer (지식 증류 로직 핵심)
@@ -160,6 +188,7 @@ trainer = DistillationTrainer(
     eval_dataset=tokenized_val,
     tokenizer=tokenizer,
     data_collator=data_collator,
+    compute_metrics=compute_metrics
 )
 
 print("\n🔥 Knowledge Distillation Start...")
