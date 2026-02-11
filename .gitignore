@@ -1,0 +1,39 @@
+# Data
+data/
+dataset/
+*.csv
+
+# Model weights
+*.pt
+*.pth
+*.ckpt
+*.nemo
+models/
+checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+wandb/

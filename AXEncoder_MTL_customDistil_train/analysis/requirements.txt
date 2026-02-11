@@ -1,0 +1,6 @@
+scipy
+pydub
+noisereduce
+numpy
+tqdm
+torch

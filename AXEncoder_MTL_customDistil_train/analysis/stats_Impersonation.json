@@ -1,0 +1,9 @@
+{
+    "global_mean_db": -20.808379680445466,
+    "global_std_db": 6.353045242068743,
+    "global_min_db": -44.779762615729474,
+    "global_max_db": -6.041831626706534,
+    "recommended_silence_thresh": -36.80837968044547,
+    "thresh_offset_used": -16,
+    "files_analyzed": 235
+}
