@@ -75,8 +75,9 @@ class PhishingDetector:
                 max_length=128,
                 return_tensors='pt'
             )
-            input_ids_list.append(encoded['input_ids'])
-            attention_mask_list.append(encoded['attention_mask'])
+            # Squeeze to remove batch dim [1, 128] -> [128]
+            input_ids_list.append(encoded['input_ids'].squeeze(0))
+            attention_mask_list.append(encoded['attention_mask'].squeeze(0))
             
         # Stack [1, Seq, Token]
         input_ids = torch.stack(input_ids_list).to(self.device).unsqueeze(0) # Add batch dim
@@ -94,11 +95,26 @@ class PhishingDetector:
         return prob, label
 
 if __name__ == "__main__":
-    # Example Usage
-    detector = PhishingDetector()
+    import argparse
     
-    # Test with a dummy file if provided
-    if len(sys.argv) > 1:
-        audio_file = sys.argv[1]
-        prob, label = detector.predict(audio_file)
-        print(f"\n🔍 Result: {label} ({prob*100:.2f}%)")
+    parser = argparse.ArgumentParser(description="Voice Phishing Detection Inference")
+    parser.add_argument("audio_path", type=str, help="Path to the audio file")
+    parser.add_argument("--model_path", type=str, default="model/best_model.pt", help="Path to the trained model checkpoint")
+    
+    args = parser.parse_args()
+    
+    # Check if model exists
+    if not os.path.exists(args.model_path):
+        # Try looking in absolute path relative to script if not found directly
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        abs_model_path = os.path.join(script_dir, args.model_path)
+        if os.path.exists(abs_model_path):
+            args.model_path = abs_model_path
+        else:
+            print(f"⚠️ Warning: Model path '{args.model_path}' not found. Using random initialization.")
+            args.model_path = None
+
+    detector = PhishingDetector(model_path=args.model_path)
+    
+    prob, label = detector.predict(args.audio_path)
+    print(f"\n🔍 Result: {label} ({prob*100:.2f}%)")
