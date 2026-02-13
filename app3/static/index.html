@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIShield - 보이스피싱 실시간 탐지</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .recording-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .log-container::-webkit-scrollbar { width: 4px; }
+        .log-container::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-2xl mb-8 text-center">
+        <h1 class="text-3xl font-bold text-blue-400 flex items-center justify-center gap-2">
+            <i class="fas fa-shield-halved"></i> AIShield
+        </h1>
+        <p class="text-slate-400 mt-2">실시간 보이스피싱 탐지 및 음성 분석 시스템</p>
+    </div>
+
+    <div class="w-full max-w-2xl bg-slate-800 rounded-3xl shadow-2xl border border-slate-700 overflow-hidden">
+        <div class="px-6 py-4 bg-slate-700/50 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div id="statusDot" class="w-3 h-3 rounded-full bg-slate-500"></div>
+                <span id="statusText" class="text-sm font-medium text-slate-300">대기 중</span>
+            </div>
+            <span id="sessionLabel" class="text-xs text-slate-500">Session: Ready</span>
+        </div>
+
+        <div class="p-8 flex flex-col items-center">
+            <div class="w-full h-32 bg-slate-900 rounded-xl mb-8 flex items-center justify-center relative overflow-hidden">
+                <canvas id="visualizer" class="w-full h-full"></canvas>
+                <div id="emptyMic" class="absolute inset-0 flex items-center justify-center text-slate-700">
+                    <i class="fas fa-microphone-slash text-4xl"></i>
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button id="startBtn" onclick="startDetect()" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-full font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-900/20">
+                    <i class="fas fa-play"></i> 탐지 시작
+                </button>
+                <button id="stopBtn" onclick="stopDetect()" disabled class="flex items-center gap-2 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-bold transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-rose-900/20">
+                    <i class="fas fa-stop"></i> 탐지 종료
+                </button>
+            </div>
+        </div>
+
+        <div class="border-t border-slate-700 bg-slate-900/50 p-6">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">분석 로그 (5s Chunks)</h3>
+            <div id="logContainer" class="log-container h-32 overflow-y-auto space-y-2 text-sm">
+                <div class="text-slate-500 italic">시스템을 가동하면 분석 결과가 여기에 표시됩니다.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 text-slate-500 text-xs text-center">
+        © 2026 AIShield <br>
+        (Nahyun Kim, Jihun Jung, Soohyo Jang)
+    </div>
+
+<script>
+let ctx = null, stream = null, analyser = null, dataArray = null, animationId = null;
+let node = null, sourceNode = null;
+let index = 0;
+let sessionId = "";
+let recording = false;
+let uploading = false; // 중복 업로드 방지(버벅임 방지)
+
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const statusText = document.getElementById("statusText");
+const statusDot = document.getElementById("statusDot");
+const logContainer = document.getElementById("logContainer");
+const canvas = document.getElementById("visualizer");
+const canvasCtx = canvas.getContext("2d");
+
+function syncCanvasSize() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.floor(rect.width));
+  canvas.height = Math.max(1, Math.floor(rect.height));
+}
+window.addEventListener("resize", syncCanvasSize);
+syncCanvasSize();
+
+function setUI(isRecording) {
+  recording = isRecording;
+  startBtn.disabled = isRecording;
+  stopBtn.disabled = !isRecording;
+
+  if (isRecording) {
+    statusText.innerText = "분석 중...";
+    statusText.classList.add("text-rose-400");
+    statusDot.classList.replace("bg-slate-500", "bg-rose-500");
+    statusDot.classList.add("recording-pulse");
+    document.getElementById("emptyMic").classList.add("hidden");
+    addLog("시스템 가동: 실시간 음성 수집을 시작합니다.", "blue");
+  } else {
+    statusText.innerText = "대기 중";
+    statusText.classList.remove("text-rose-400");
+    statusDot.classList.replace("bg-rose-500", "bg-slate-500");
+    statusDot.classList.remove("recording-pulse");
+    document.getElementById("emptyMic").classList.remove("hidden");
+    addLog("탐지가 종료되었습니다.", "slate");
+  }
+}
+
+function addLog(message, color = "slate") {
+  const colors = {
+    blue: "text-blue-400",
+    rose: "text-rose-400",
+    slate: "text-slate-400",
+    green: "text-emerald-400"
+  };
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.className = `${colors[color]} flex gap-2`;
+  div.innerHTML = `<span class="opacity-50">[${time}]</span> <span>${message}</span>`;
+  logContainer.prepend(div);
+}
+
+function draw() {
+  animationId = requestAnimationFrame(draw);
+  if (!analyser || !dataArray) return;
+
+  analyser.getByteFrequencyData(dataArray);
+
+  canvasCtx.fillStyle = "rgb(15, 23, 42)";
+  canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const barWidth = (canvas.width / dataArray.length) * 2.5;
+  let x = 0;
+
+  for (let i = 0; i < dataArray.length; i++) {
+    const barHeight = dataArray[i] / 2;
+    canvasCtx.fillStyle = "rgb(59, 130, 246)";
+    canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+    x += barWidth + 1;
+  }
+}
+
+function floatTo16BitPCM(float32) {
+  const buffer = new ArrayBuffer(float32.length * 2);
+  const view = new DataView(buffer);
+  let offset = 0;
+  for (let i = 0; i < float32.length; i++, offset += 2) {
+    let s = Math.max(-1, Math.min(1, float32[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return buffer;
+}
+
+function createWav(pcm, sampleRate) {
+  const pcm16 = floatTo16BitPCM(pcm);
+  const buffer = new ArrayBuffer(44 + pcm16.byteLength);
+  const view = new DataView(buffer);
+  const write = (o, s) => [...s].forEach((c, i) => view.setUint8(o + i, c.charCodeAt(0)));
+
+  write(0, "RIFF");
+  view.setUint32(4, 36 + pcm16.byteLength, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  write(36, "data");
+  view.setUint32(40, pcm16.byteLength, true);
+  new Uint8Array(buffer, 44).set(new Uint8Array(pcm16));
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+async function startDetect() {
+  if (recording) return;
+
+  sessionId = Date.now().toString();
+  document.getElementById("sessionLabel").innerText = `Session: ${sessionId}`;
+  index = 0;
+  uploading = false;
+  setUI(true);
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    ctx = new AudioContext({ sampleRate: 16000 });
+
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    await ctx.audioWorklet.addModule("/static/recoder-worklet.js");
+
+    sourceNode = ctx.createMediaStreamSource(stream);
+    node = new AudioWorkletNode(ctx, "recoder-worklet");
+
+    // worklet에서 chunk를 받을 때마다 업로드 + 결과 표시
+    node.port.onmessage = async (e) => {
+      if (!recording) return;
+      if (uploading) return;           // 중복 업로드 방지
+      uploading = true;
+
+      addLog(`청크 #${index + 1} 서버 전송 중...`, "slate");
+
+      try {
+        const wav = createWav(e.data, ctx.sampleRate);
+        const form = new FormData();
+        form.append("file", wav);
+        form.append("session_id", sessionId);
+        form.append("index", String(index));
+
+        const resp = await fetch("/upload_wav", { method: "POST", body: form });
+
+        if (!resp.ok) {
+          addLog(`서버 응답 오류: ${resp.status}`, "rose");
+          return;
+        }
+
+        const data = await resp.json();
+        addLog(`청크 #${index + 1} 저장 완료`, "green");
+
+        if (data.error) {
+          addLog(`분석 오류: ${data.error}`, "rose");
+        } else {
+          const txt = (data.stt_text || "").trim();
+          addLog(`STT: ${txt.length ? txt : "(인식 텍스트 없음)"}`, "slate");
+
+          if (data.pred !== null && data.pred !== undefined) {
+            const score = (data.score !== null && data.score !== undefined) ? Number(data.score).toFixed(4) : "N/A";
+
+            // 라벨 매핑
+            const isPhishing = (data.pred === 1);
+
+            addLog(
+              `판정: ${isPhishing ? "보이스피싱 의심" : "보이스피싱 아님"} (score=${score})`, // score 출력 넣을까말까...
+              isPhishing ? "rose" : "blue"
+            );
+          } else {
+            addLog(`판정: (모델 출력 없음)`, "rose");
+          }
+        }
+
+        index += 1;
+
+      } catch (err) {
+        addLog(`전송 실패: ${err.message}`, "rose");
+      } finally {
+        uploading = false;
+      }
+    };
+
+    // 연결은 여기서 1회만
+    sourceNode.connect(analyser);
+    analyser.connect(node);
+
+    syncCanvasSize();
+    draw();
+
+  } catch (err) {
+    addLog(`마이크 시작 실패: ${err.message}`, "rose");
+    stopDetect();
+  }
+}
+
+async function stopDetect() {
+  if (!recording) return;
+
+  setUI(false);
+
+  try {
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+
+    if (node) { try { node.disconnect(); } catch(e) {} node = null; }
+    if (analyser) { try { analyser.disconnect(); } catch(e) {} analyser = null; }
+    if (sourceNode) { try { sourceNode.disconnect(); } catch(e) {} sourceNode = null; }
+
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+
+    if (ctx) {
+      try { await ctx.close(); } catch(e) {}
+      ctx = null;
+    }
+  } catch (err) {
+    addLog(`종료 처리 중 오류: ${err.message}`, "rose");
+  }
+}
+</script>
+</body>
+</html>
