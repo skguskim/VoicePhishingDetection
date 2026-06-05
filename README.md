@@ -2,7 +2,7 @@
 ### Knowledge Distillation-based Text Voice Phishing Detection System
 
 서울과학기술대학교 인공지능응용학과  
-김나현, 정지훈
+김나현, 정지훈, 장수효
 
 ---
 
