@@ -228,9 +228,9 @@ http://localhost:8000
 
 ### Teacher Model
 
-\`\`\`bash
+```bash
 python klue-RoBERTa/train_teacher.py
-\`\`\`
+```
 
 ### Student Model
 
@@ -300,5 +300,3 @@ FastAPI 기반 실시간 추론 환경을 구현하였다.
 3. Pappagari et al., Hierarchical Transformers for Long Document Classification, 2019.
 4. Sim et al., Voice Phishing Detection Scheme using a GPT-3.5 based Large Language Model, 2024.
 5. Park et al., Enhanced Voice Phishing Detection using an LLM-based Framework for Data Augmentation and Classification, IEEE Access, 2025.
-
-EOF
