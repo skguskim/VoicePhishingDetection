@@ -30,7 +30,7 @@
 
 ## System Pipeline
 
-\`\`\`text
+```text
 Audio Input
     ↓
 Whisper STT
@@ -46,13 +46,13 @@ Student Model
 Real-time Inference
     ↓
 Voice Phishing Prediction
-\`\`\`
+```
 
 ---
 
 ## Repository Structure
 
-\`\`\`text
+```text
 VoicePhishingDetection/
 │
 ├── data/
@@ -84,7 +84,7 @@ VoicePhishingDetection/
 ├── requirements.txt
 ├── environment.yml
 └── README.md
-\`\`\`
+```
 
 ---
 
@@ -131,7 +131,7 @@ STT 결과의 불필요한 텍스트를 정리한다.
 
 Teacher 모델은 KLUE-RoBERTa를 기반으로 구성된다.
 
-\`\`\`text
+```text
 Input Text
     ↓
 KLUE-RoBERTa Encoder
@@ -139,7 +139,7 @@ KLUE-RoBERTa Encoder
 Classification Head
     ↓
 Prediction
-\`\`\`
+```
 
 Teacher 모델은 높은 분류 성능을 확보하는 역할을 수행하며, 이후 Student 모델 학습에 사용된다.
 
@@ -159,12 +159,12 @@ Student 모델은 다음 정보를 학습한다.
 
 ### Loss Function
 
-\`\`\`text
+```text
 L_total =
 α · CrossEntropy Loss
 + β · Knowledge Distillation Loss
 + γ · Cosine Similarity Loss
-\`\`\`
+```
 
 | Loss | Description |
 |---|---|
@@ -180,15 +180,15 @@ L_total =
 
 ### Training
 
-\`\`\`bash
+```bash
 python ModernBERT/train.py
-\`\`\`
+```
 
 ### Knowledge Distillation
 
-\`\`\`bash
+```bash
 python ModernBERT/kd.py
-\`\`\`
+```
 
 ---
 
@@ -198,7 +198,7 @@ FastAPI 기반 실시간 데모 시스템을 제공한다.
 
 ### Inference Pipeline
 
-\`\`\`text
+```text
 Audio Upload
     ↓
 Whisper STT
@@ -208,19 +208,19 @@ Text Extraction
 Student Model Inference
     ↓
 Prediction Score
-\`\`\`
+```
 
 ### Run Demo
 
-\`\`\`bash
+```bash
 uvicorn app2.main:app --reload
-\`\`\`
+```
 
 기본 주소:
 
-\`\`\`text
+```text
 http://localhost:8000
-\`\`\`
+```
 
 ---
 
@@ -234,9 +234,9 @@ python klue-RoBERTa/train_teacher.py
 
 ### Student Model
 
-\`\`\`bash
+```bash
 python klue-RoBERTa/train_student.py
-\`\`\`
+```
 
 ---
 
@@ -244,16 +244,16 @@ python klue-RoBERTa/train_student.py
 
 ### Conda
 
-\`\`\`bash
+```bash
 conda env create -f environment.yml
 conda activate capstone
-\`\`\`
+```
 
 ### Pip
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ---
 
